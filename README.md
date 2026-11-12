@@ -32,6 +32,41 @@ rm ~/.local/bin/asus-profile-osd ~/.local/bin/asus-aura-next \
 To let the charger switch to Performance again, set `change_platform_profile_on_ac: true` in
 `/etc/asusd/asusd.ron` (stop `asusd` first, then start it again).
 
+## widgets/glass-pill/
+
+Compact frosted-glass system monitor for the KDE desktop (Plasma 6), styled for the Layan theme.
+
+- Four animated rings: **CPU**, **GPU**, **RAM**, **Temp** (Temp turns amber at 72 °C, red at 85 °C)
+- Real frosted glass: the wallpaper behind the pill is blurred, with a tint, light edge and top sheen
+- Hover a ring for details: CPU clock, GPU power, fan speeds, memory used/total
+- Data comes from KDE's `ksystemstats` sensors (same as the System Monitor app)
+
+Install (no sudo):
+```bash
+kpackagetool6 -t Plasma/Applet -i widgets/glass-pill
+```
+Then right-click the desktop → **Add Widgets** → "Glass System Pill". After editing the code, update with
+`kpackagetool6 -t Plasma/Applet -u widgets/glass-pill` and restart Plasma:
+`systemctl --user restart plasma-plasmashell`.
+
+The blur reads the wallpaper image set in the desktop's Image wallpaper plugin; with other wallpaper
+types it falls back to a plain tinted glass.
+
+**Panel mode:** put the same widget in a vertical panel and it switches to a tall column:
+CPU (ring + clock), GPU (ring + power), RAM (ring + GB used), Temp (ring + CPU·GPU °C),
+two fans that spin at their real speed, and network down/up.
+
+Auto-hiding glass panel on the left edge (shows when the mouse touches the edge):
+```bash
+qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript '
+var p = new Panel("org.kde.panel");
+p.location = "left"; p.height = 68; p.lengthMode = "fit"; p.alignment = "center";
+p.hiding = "autohide"; p.floating = true;
+p.addWidget("com.mramaran.glasspill");'
+```
+For the translucent glass look: right-click the panel → **Show Panel Configuration** →
+Opacity: **Translucent**.
+
 ## touchpad/
 
 Windows-style touchpad features.

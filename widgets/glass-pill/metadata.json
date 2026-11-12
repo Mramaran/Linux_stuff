@@ -1,0 +1,18 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "mramaran"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Compact frosted-glass pill with live CPU, GPU, RAM and temperature rings",
+        "Icon": "utilities-system-monitor",
+        "Id": "com.mramaran.glasspill",
+        "License": "MIT",
+        "Name": "Glass System Pill",
+        "Version": "1.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
