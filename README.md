@@ -67,6 +67,65 @@ p.addWidget("com.mramaran.glasspill");'
 For the translucent glass look: right-click the panel → **Show Panel Configuration** →
 Opacity: **Translucent**.
 
+## focus-music/
+
+Offline background music for the [Fokus](https://gitlab.com/divinae/focus-plasmoid/) pomodoro
+widget. Plays local files only, so it uses no internet data.
+
+| Fokus event | Music |
+|---|---|
+| Focus starts | Fades in; keeps going if already playing |
+| Pause | Fades out and pauses in place |
+| Resume | Fades back in from the same spot |
+| Focus time runs out | **Keeps playing** |
+| Break started | Fades out and stops |
+| Stop pressed | Fades out and stops |
+
+Why this music: research shows lyrics hurt reading, writing and memorising, while steady
+instrumental music at low volume is neutral-to-helpful. All tracks are instrumental.
+
+| Mode | Folder | Music |
+|---|---|---|
+| `calm` (default) | `~/Music/Focus/Calm` | Calm piano & ambient — best for study / memorising |
+| `lofi` | `~/Music/Focus/Lofi` | Instrumental lo-fi beats |
+| `mix` | both | Everything, shuffled |
+
+Tracks are shuffled every session. Default volume is 35%. Drop any extra instrumental tracks
+into those folders and they are picked up automatically.
+
+`./download-music.sh` downloads the music once (about 250 MB) — the audio files are not stored
+in this repo; credits are written to `~/Music/Focus/CREDITS.txt`:
+- **Calm** — 14 tracks (~1 h 42 min) by Kevin MacLeod (incompetech.com), CC-BY 4.0
+- **Lo-fi** — 16 tracks from OpenGameArt.org, CC0 public domain: 7 by Holizna
+  ("Happy Lo-Fi" collection) and 9 by TAD ("Lofi Compilation")
+
+**Right-click the Fokus widget** to change it — no terminal needed:
+- ☑ **Focus music** — turn music on/off (turning it on mid-focus starts it right away)
+- ◉ Calm piano & ambient / Lo-fi beats / Mix (both)
+- Open music folder…
+- ◉ Volume: Low (20%) / Medium (35%) / High (55%)
+
+The patch also gives Fokus a frosted-glass background on the desktop (blurred wallpaper, tint,
+light edge, top sheen, soft shadow) matching the Glass System Pill and the Layan theme.
+
+The same from a terminal:
+```bash
+focus-music mode lofi      # calm | lofi | mix (applies immediately if playing)
+focus-music volume 25      # 0-100
+focus-music status
+focus-music toggle         # manual on/off
+```
+
+Install: `./install.sh` (downloads the music, copies the scripts to `~/.local/bin`, patches
+Fokus and sets its focus-start / break-start / stop / pause scripts). Needs `vlc`, `pactl`,
+`curl`, `python3`.
+
+`fokus-patch.sh` changes the Fokus widget in three ways: a pause hook (Fokus has none of its
+own), the right-click music menu, and the glass background (`fokus/FokusGlass.qml`). The
+original files are kept as `*.orig` and re-running it rebuilds from them. If a Fokus update
+undoes it, run `./fokus-patch.sh` again and restart Plasma
+(`systemctl --user restart plasma-plasmashell`).
+
 ## touchpad/
 
 Windows-style touchpad features.

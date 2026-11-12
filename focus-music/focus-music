@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# focus-music — offline background music for focus sessions (made for the Fokus pomodoro widget).
+#
+#   focus-music start            start playing, or resume if paused (no-op if already playing)
+#   focus-music pause            fade out and pause (continues from the same spot on resume)
+#   focus-music stop             fade out and stop
+#   focus-music toggle           start or stop
+#   focus-music status           show what is playing
+#   focus-music mode [NAME]      show or set the music: calm | lofi | mix
+#   focus-music volume [0-100]   show or set the volume (default 35)
+#   focus-music enable|disable   turn focus music on/off (off: "start" does nothing)
+#   focus-music get              one line for scripts: "<mode> <volume> <enabled 1|0>"
+#
+# The same settings are in the Fokus widget's right-click menu (see fokus-patch.sh).
+#
+# Music is played from local folders, shuffled — no internet data is used:
+#   calm   ~/Music/Focus/Calm   calm piano & ambient   (default, best for study / memorising)
+#   lofi   ~/Music/Focus/Lofi   instrumental lo-fi beats
+#   mix    both folders together
+# Base folder can be changed with $FOCUS_MUSIC_DIR.
+set -u
+
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/focus-music"
+RUN_FILE="${XDG_RUNTIME_DIR:-/tmp}/focus-music.pid"
+PAUSE_FILE="${XDG_RUNTIME_DIR:-/tmp}/focus-music.paused"   # player frozen by "pause"
+NOW_FILE="${XDG_RUNTIME_DIR:-/tmp}/focus-music.now"        # music actually playing
+BASE="${FOCUS_MUSIC_DIR:-$HOME/Music/Focus}"
+MODES="calm lofi mix"
+
+get_mode() {
+    local m; m=$(cat "$CONF_DIR/mode" 2>/dev/null)
+    case " $MODES " in *" $m "*) echo "$m" ;; *) echo calm ;; esac   # old/unknown values -> calm
+}
+get_volume() { cat "$CONF_DIR/volume" 2>/dev/null || echo 35; }
+is_enabled() { [ ! -f "$CONF_DIR/disabled" ]; }
+player_pid() { cat "$RUN_FILE" 2>/dev/null; }
+is_running() { local p; p=$(player_pid); [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
+
+has_tracks() {
+    [ -d "$1" ] && [ -n "$(find "$1" -type f \( -iname '*.mp3' -o -iname '*.ogg' -o -iname '*.opus' \
+        -o -iname '*.flac' -o -iname '*.wav' -o -iname '*.m4a' \) -print -quit)" ]
+}
+
+# folders to play for a mode (only ones that contain tracks)
+folders_for() {
+    local d
+    case "$1" in
+        calm) d="$BASE/Calm" ;;
+        lofi) d="$BASE/Lofi" ;;
+        mix)  d="$BASE/Calm $BASE/Lofi" ;;
+    esac
+    for f in $d; do has_tracks "$f" && echo "$f"; done
+}
+
+# PulseAudio/PipeWire stream index belonging to our player process
+sink_input() {
+    pactl list sink-inputs 2>/dev/null | awk -v pid="$1" '
+        /^Sink Input #/ { id = substr($3, 2) }
+        /application.process.id = / { gsub(/"/, "", $3); if ($3 == pid) { print id; exit } }'
+}
+
+# fade PID FROM TO SECONDS
+fade() {
+    local pid=$1 from=$2 to=$3 secs=$4 si steps=20 i v
+    si=$(sink_input "$pid"); [ -n "$si" ] || return 0
+    for ((i = 1; i <= steps; i++)); do
+        v=$(( from + (to - from) * i / steps ))
+        pactl set-sink-input-volume "$si" "${v}%" 2>/dev/null || return 0
+        sleep "$(awk -v s="$secs" -v n="$steps" 'BEGIN { printf "%.3f", s / n }')"
+    done
+}
+
+start() {
+    if ! is_enabled; then echo "focus music is turned off"; return 0; fi
+    if is_running; then
+        if [ -f "$PAUSE_FILE" ]; then resume; else echo "already playing"; fi
+        return 0
+    fi
+    rm -f "$PAUSE_FILE"
+    local mode vol pid dirs=()
+    mode=$(get_mode)
+    mapfile -t dirs < <(folders_for "$mode")
+    if [ ${#dirs[@]} -eq 0 ] && [ "$mode" != calm ]; then
+        echo "no $mode tracks yet: playing calm"; mode=calm
+        mapfile -t dirs < <(folders_for calm)
+    fi
+    if [ ${#dirs[@]} -eq 0 ]; then echo "no music found in $BASE"; return 0; fi
+
+    vol=$(get_volume)
+    # Fully detached so the caller (Fokus) is never kept waiting.
+    setsid cvlc --quiet --intf dummy --no-video --random --loop --no-play-and-exit \
+        --meta-title "Focus music" "${dirs[@]}" </dev/null >/dev/null 2>&1 &
+    pid=$!
+    echo "$pid" > "$RUN_FILE"
+    echo "$mode" > "$NOW_FILE"
+    # Fade in once the audio stream shows up.
+    (
+        for _ in $(seq 1 50); do
+            [ -n "$(sink_input "$pid")" ] && break
+            kill -0 "$pid" 2>/dev/null || exit 0
+            sleep 0.1
+        done
+        si=$(sink_input "$pid"); [ -n "$si" ] && pactl set-sink-input-volume "$si" 0%
+        fade "$pid" 0 "$vol" 3
+    ) </dev/null >/dev/null 2>&1 &
+    disown -a
+    echo "playing: $mode"
+}
+
+stop() {
+    if ! is_running; then rm -f "$RUN_FILE" "$PAUSE_FILE" "$NOW_FILE"; echo "not playing"; return 0; fi
+    local pid; pid=$(player_pid)
+    if [ -f "$PAUSE_FILE" ]; then
+        kill -CONT "$pid" 2>/dev/null          # frozen player: wake it so it can exit
+    else
+        fade "$pid" "$(get_volume)" 0 1.5
+    fi
+    kill "$pid" 2>/dev/null
+    rm -f "$RUN_FILE" "$PAUSE_FILE" "$NOW_FILE"
+    echo "stopped"
+}
+
+# Pause freezes the player in place; resume continues from the same spot.
+pause() {
+    if ! is_running; then echo "not playing"; return 0; fi
+    if [ -f "$PAUSE_FILE" ]; then echo "already paused"; return 0; fi
+    local pid; pid=$(player_pid)
+    fade "$pid" "$(get_volume)" 0 1
+    kill -STOP "$pid" 2>/dev/null
+    touch "$PAUSE_FILE"
+    echo "paused"
+}
+
+resume() {
+    local pid; pid=$(player_pid)
+    kill -CONT "$pid" 2>/dev/null
+    rm -f "$PAUSE_FILE"
+    ( fade "$pid" 0 "$(get_volume)" 1.5 ) </dev/null >/dev/null 2>&1 &
+    disown -a
+    echo "resumed"
+}
+
+case "${1:-status}" in
+    start)   start ;;
+    stop)    stop ;;
+    pause)   pause ;;
+    enable)  mkdir -p "$CONF_DIR"; rm -f "$CONF_DIR/disabled"; echo "focus music on" ;;
+    disable) mkdir -p "$CONF_DIR"; touch "$CONF_DIR/disabled"; stop >/dev/null; echo "focus music off" ;;
+    get)     if is_enabled; then e=1; else e=0; fi; echo "$(get_mode) $(get_volume) $e" ;;
+    toggle)  if is_running && [ ! -f "$PAUSE_FILE" ]; then stop; else start; fi ;;
+    status)
+        if is_running && [ -f "$PAUSE_FILE" ]; then echo "paused: $(cat "$NOW_FILE" 2>/dev/null)"
+        elif is_running; then echo "playing: $(cat "$NOW_FILE" 2>/dev/null || get_mode) at $(get_volume)%"
+        else echo "not playing (mode: $(get_mode), volume: $(get_volume)%)"; fi ;;
+    mode)
+        if [ -z "${2:-}" ]; then echo "$(get_mode)   (options: $MODES)"; exit 0; fi
+        case " $MODES " in *" $2 "*) ;; *) echo "unknown mode: $2 (options: $MODES)"; exit 1 ;; esac
+        mkdir -p "$CONF_DIR"; echo "$2" > "$CONF_DIR/mode"
+        echo "mode: $2"
+        if is_running; then stop >/dev/null; start; fi ;;
+    volume)
+        if [ -z "${2:-}" ]; then get_volume; exit 0; fi
+        case "$2" in ''|*[!0-9]*) echo "volume must be 0-100"; exit 1 ;; esac
+        [ "$2" -le 100 ] || { echo "volume must be 0-100"; exit 1; }
+        mkdir -p "$CONF_DIR"; echo "$2" > "$CONF_DIR/volume"
+        if is_running; then si=$(sink_input "$(player_pid)"); [ -n "$si" ] && pactl set-sink-input-volume "$si" "$2%"; fi
+        echo "volume: $2%" ;;
+    *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
