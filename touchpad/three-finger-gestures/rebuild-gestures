@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Rebuild InputActions (3-finger gestures) after a KDE Plasma / KWin update.
+set -e
+echo "KWin version: $(kwin_wayland --version)"
+bash ~/.local/share/inputactions-installer/install.sh --ctl --kwin --latest-stable
+echo
+echo "Done. Log out and back in to load the rebuilt gestures plugin."

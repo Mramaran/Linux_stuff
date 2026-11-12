@@ -1,0 +1,12 @@
+[Unit]
+Description=Windows-style touchpad edge motion
+After=systemd-udev-settle.service
+
+[Service]
+ExecStart=/usr/local/bin/touchpad-edge-motion
+Restart=always
+RestartSec=2
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

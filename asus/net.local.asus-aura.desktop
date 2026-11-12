@@ -1,0 +1,8 @@
+[Desktop Entry]
+Exec=HOME/.local/bin/asus-aura-next
+Name=ASUS Aura Next Mode
+NoDisplay=true
+StartupNotify=false
+Type=Application
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-Shortcuts=Launch (4)

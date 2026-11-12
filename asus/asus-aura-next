@@ -1,0 +1,8 @@
+#!/bin/bash
+# Fn+F4: switch to the next Aura keyboard effect and show it on screen.
+asusctl aura effect --next-mode >/dev/null 2>&1
+sleep 0.2
+mode=$(grep -m1 'current_mode' /etc/asusd/aura_tuf.ron | sed -E 's/.*current_mode: *([A-Za-z]+).*/\1/')
+pretty=$(echo "$mode" | sed -E 's/([a-z])([A-Z])/\1 \2/g')
+qdbus6 org.kde.plasmashell /org/kde/osdService org.kde.osdService.showText \
+    "input-keyboard-color" "Aura: ${pretty:-next mode}" >/dev/null 2>&1

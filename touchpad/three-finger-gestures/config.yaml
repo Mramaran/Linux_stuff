@@ -1,0 +1,56 @@
+# Windows-style 3-finger touchpad gestures (InputActions for KDE Plasma)
+
+# Start recognising 3-finger swipes after less finger movement (default 10)
+device_rules:
+  - conditions: $touchpad
+    motion_threshold_3: 6
+
+touchpad:
+  gestures:
+    # Quick flick left/right: jump straight to the previous app (no switcher shown)
+    - type: swipe
+      fingers: 3
+      direction: left_right
+      speed: fast
+      actions:
+        - on: begin
+          input:
+            - keyboard: [ leftalt+tab ]
+
+    # Slow swipe left/right: app switcher. Keep fingers down and slide to move
+    # through apps; lift to switch to the selected one.
+    - type: swipe
+      fingers: 3
+      direction: left_right
+      speed: slow
+      actions:
+        - on: begin
+          input:
+            - keyboard: [ +leftalt, tab ]
+        - on: update
+          interval: -35
+          input:
+            - keyboard: [ leftshift+tab ]
+        - on: update
+          interval: 35
+          input:
+            - keyboard: [ tab ]
+        - on: end_cancel
+          input:
+            - keyboard: [ -leftalt ]
+
+    # 3 fingers up: show all windows (like Windows Task View)
+    - type: swipe
+      fingers: 3
+      direction: up
+      actions:
+        - on: begin
+          plasma_shortcut: kwin,Overview
+
+    # 3 fingers down: show desktop
+    - type: swipe
+      fingers: 3
+      direction: down
+      actions:
+        - on: begin
+          plasma_shortcut: kwin,Show Desktop
