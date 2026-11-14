@@ -340,14 +340,25 @@ PlasmoidItem {
     }
 
     // ---- vertical panel column -----------------------------------------------
-    component Section: ColumnLayout {
+    // Plasma's ToolTipArea shows the tooltip in its own window placed beside the
+    // panel; a QQC2.ToolTip would be clipped to the narrow panel window.
+    component Section: PlasmaCore.ToolTipArea {
         id: sec
         property string label: ""
         property string detail: ""
-        spacing: 3
+        default property alias content: inner.data
         Layout.fillWidth: true
-        HoverHandler { id: secHover }
-        QQC2.ToolTip { visible: secHover.hovered && sec.detail.length > 0; delay: 250; text: sec.detail }
+        implicitWidth: inner.implicitWidth
+        implicitHeight: inner.implicitHeight
+        mainText: sec.label
+        subText: sec.detail
+        active: sec.detail.length > 0
+        location: Plasmoid.location
+        ColumnLayout {
+            id: inner
+            anchors.fill: parent
+            spacing: 3
+        }
     }
     component Caption: Text {
         Layout.alignment: Qt.AlignHCenter
@@ -372,7 +383,7 @@ PlasmoidItem {
         Item { Layout.preferredHeight: 6 }
 
         Section {
-            detail: root.cpuDetail
+            label: "CPU"; detail: root.cpuDetail
             Caption { text: "CPU"; font.capitalization: Font.AllUppercase; font.letterSpacing: 1.2 }
             Dial { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: col.dialSize; Layout.preferredHeight: col.dialSize
                    accent: root.cBlue; fraction: root.num(cpuUse) / 100; valueText: Math.round(root.num(cpuUse)) }
@@ -380,7 +391,7 @@ PlasmoidItem {
         }
         Divider {}
         Section {
-            detail: root.gpuDetail
+            label: "GPU"; detail: root.gpuDetail
             Caption { text: "GPU"; font.capitalization: Font.AllUppercase; font.letterSpacing: 1.2 }
             Dial { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: col.dialSize; Layout.preferredHeight: col.dialSize
                    accent: root.cViolet; fraction: root.num(gpuUse) / 100; valueText: Math.round(root.num(gpuUse)) }
@@ -388,7 +399,7 @@ PlasmoidItem {
         }
         Divider {}
         Section {
-            detail: root.memDetail
+            label: "Memory"; detail: root.memDetail
             Caption { text: "RAM"; font.capitalization: Font.AllUppercase; font.letterSpacing: 1.2 }
             Dial { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: col.dialSize; Layout.preferredHeight: col.dialSize
                    accent: root.cPink; fraction: root.num(memPct) / 100; valueText: Math.round(root.num(memPct)) }
@@ -396,7 +407,7 @@ PlasmoidItem {
         }
         Divider {}
         Section {
-            detail: root.tempDetail
+            label: "Temperature"; detail: root.tempDetail
             Caption { text: "TEMP"; font.letterSpacing: 1.2 }
             Dial { Layout.alignment: Qt.AlignHCenter; Layout.preferredWidth: col.dialSize; Layout.preferredHeight: col.dialSize
                    accent: root.hotColor(root.maxTemp); fraction: Math.max(0, (root.maxTemp - 30) / 70)
@@ -405,6 +416,7 @@ PlasmoidItem {
         }
         Divider {}
         Section {
+            label: "Fans"
             detail: "CPU fan  " + fanCpu.formattedValue + "\nGPU fan  " + fanGpu.formattedValue
             Caption { text: "FANS"; font.letterSpacing: 1.2 }
             RowLayout {
@@ -417,6 +429,7 @@ PlasmoidItem {
         }
         Divider {}
         Section {
+            label: "Network"
             detail: "Download  " + netDown.formattedValue + "\nUpload  " + netUp.formattedValue
             Caption { text: "NET"; font.letterSpacing: 1.2 }
             Text { Layout.alignment: Qt.AlignHCenter; text: "↓ " + root.shortRate(root.num(netDown))
